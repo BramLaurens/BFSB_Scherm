@@ -317,12 +317,14 @@ void setup(void) {
 
 void loop() {
 
-  if(gamePaused == false){
-
-    if(SOGroutineDone == false){
+  /*Run start of game routine once after resetting*/
+  if(SOGroutineDone == false){
       SOG();
       SOGroutineDone = true;
     }
+
+  if(gamePaused == false){
+
     pausePrinted = false;
 
     espResetcheck();
