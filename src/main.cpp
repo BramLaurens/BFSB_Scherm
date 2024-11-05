@@ -12,7 +12,7 @@
 #define TFT_RST       4 // Or set to -1 and connect to Arduino RESET pin
 #define TFT_DC        15
 
-#define reset 16 
+#define reset 19 
 #define play 17
 
 /////////////////ESPNOW INIT/////////////////////////////////////
@@ -210,12 +210,12 @@ void SOG(){
 void playPause(){
   if((digitalRead(play) == LOW) && gamePaused == false){
     gamePaused = true;
-    delay(10);
+    delay(20);
   }
 
   if((digitalRead(play) == LOW) && gamePaused == true){
     gamePaused = false;
-    delay(10);
+    delay(20);
   }
 }
 
@@ -238,13 +238,18 @@ void espResetcheck(){
 
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   memcpy(&encodedScore, incomingData, sizeof(encodedScore));
-  Serial.print(encodedScore[0]);
-  Serial.print("  ");
-  Serial.print(encodedScore[1]);
-  Serial.print("  ");
-  Serial.println(encodedScore[2]);
+  // Serial.print(encodedScore[0]);
+  // Serial.print("  ");
+  // Serial.print(encodedScore[1]);
+  // Serial.print("  ");
+  // Serial.println(encodedScore[2]);
   inputData();
-  displayRefresh();
+  if(gamePaused == true){
+    displayPaused();
+  }
+  else{
+    displayRefresh();
+  }
 }
 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
