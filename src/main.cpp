@@ -12,12 +12,27 @@
 #define TFT_RST       4 // Or set to -1 and connect to Arduino RESET pin
 #define TFT_DC        15
 
+/////////////////ESPNOW INIT/////////////////////////////////////
+uint8_t player1Mac[] = {0xC8, 0x2E, 0x18, 0x25, 0xEC, 0xB0};
+esp_now_peer_info_t peerInfo;
+String sta;
+
+///////////////INTEGERS///////////////////////////////////////////
+
 uint16_t encodedScore[] = {0,0,0};
+
 int player1score = 0;
 int player2score = 0;
 int player3score = 0;
 int player4score = 0;
 int player5score = 0;
+
+int timeRemaining = 0;
+int secondTick = 0;
+int gameLength = 1;
+
+uint8_t gameFlag = 1;
+int gameFlagupdated = 0;
 
 // OPTION 1 (recommended) is to use the HARDWARE SPI pins, which are unique
 // to each board and not reassignable. For Arduino Uno: MOSI = pin 11 and
@@ -26,21 +41,6 @@ int player5score = 0;
 
 // For 1.44" and 1.8" TFT with ST7735 use:
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
-
-// For 1.14", 1.3", 1.54", 1.69", and 2.0" TFT with ST7789:
-//Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
-
-
-// OPTION 2 lets you interface the display using ANY TWO or THREE PINS,
-// tradeoff being that performance is not as fast as hardware SPI above.
-//#define TFT_MOSI 11  // Data out
-//#define TFT_SCLK 13  // Clock out
-
-// For ST7735-based displays, we will use this call
-//Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
-
-// OR for the ST7789-based displays, we will use this call
-//Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
 
 
 void testdrawtext(char *text, uint16_t color) {
@@ -59,8 +59,13 @@ void testText(){
   tft.print("This is a test");
 }
 
-void scoreDraw(){
-  tft.fillScreen(ST77XX_BLACK);
+void displayRefresh(){
+  if(gameFlag == 1){
+    tft.fillScreen(ST77XX_BLACK);
+  }
+  if(gameFlag == 0){
+    tft.fillScreen(ST77XX_RED);
+  }
   tft.setRotation(3);
   tft.setCursor(0, 0);
   tft.setTextColor(ST7735_WHITE);
@@ -93,6 +98,14 @@ void scoreDraw(){
   tft.print("Player 5");
   tft.print(" Score:");
   tft.print(player5score);
+
+  tft.setCursor(0,80);
+  tft.setTextSize(2);
+  tft.print("Time Left: ");
+  tft.setCursor(0,100);
+  tft.print(timeRemaining);
+
+
 }
 
 void inputData(){
@@ -144,10 +157,39 @@ void inputData(){
 
 }
 
+void gameTimer(){
+  if((millis() - secondTick > 1000) && timeRemaining > 0){
+    timeRemaining = (timeRemaining - 1);
+    secondTick = millis();
+    displayRefresh();
+  }
+
+  if(timeRemaining == 0){
+    gameFlag = 0;
+  }
+}
+
+void gameFlagsend(){
+  if(millis() - gameFlagupdated > 1000){
+    esp_now_send(player1Mac, (uint8_t *) &gameFlag, sizeof(gameFlag));
+    gameFlagupdated = millis();
+  }
+}
+
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   memcpy(&encodedScore, incomingData, sizeof(encodedScore));
+  Serial.print(encodedScore[0]);
+  Serial.print("  ");
+  Serial.print(encodedScore[1]);
+  Serial.print("  ");
+  Serial.println(encodedScore[2]);
   inputData();
-  scoreDraw();
+  displayRefresh();
+}
+
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  if(status == ESP_NOW_SEND_SUCCESS) 
+  sta="Delivery Success"; else sta="Delivery Fail";
 }
 
 void setup(void) {
@@ -158,6 +200,13 @@ void setup(void) {
   //Serial.println(String(WiFi.macAddress()));
   esp_now_init();
   esp_now_register_recv_cb(OnDataRecv);
+  esp_now_register_send_cb(OnDataSent);
+
+  //////////ADDING ESP PEERS//////////////////
+  memcpy(peerInfo.peer_addr, player1Mac, 6);
+  peerInfo.channel = 0;  
+  peerInfo.encrypt = false;
+  esp_now_add_peer(&peerInfo);
 
   // Use this initializer if using a 1.8" TFT screen:
   tft.initR(INITR_BLACKTAB);      // Init ST7735S chip, black tab
@@ -173,10 +222,14 @@ void setup(void) {
   tft.fillScreen(ST77XX_BLACK);
   testText();
   Serial.println("done");
+
+  timeRemaining = (gameLength * 60 * 1000)/1000;
 }
 
 void loop() {
-  delay(500);
+  gameTimer();
+  gameFlagsend();
+  delay(1);
 }
 
 
