@@ -12,9 +12,16 @@
 #define TFT_RST       4 // Or set to -1 and connect to Arduino RESET pin
 #define TFT_DC        15
 
+#define reset 16 
+#define play 17
+
 /////////////////ESPNOW INIT/////////////////////////////////////
 uint8_t player1Mac[] = {0xC8, 0x2E, 0x18, 0x25, 0xEC, 0xB0};
 uint8_t player2Mac[] = {0xD8, 0x13, 0x2A, 0x72, 0xFF, 0x18};
+uint8_t player3Mac[] = {0xD8, 0x13, 0x2A, 0x73, 0x6F, 0x14};
+uint8_t player4Mac[] = {0xD8, 0x13, 0x2A, 0x73, 0x5B, 0x4C};
+uint8_t player5Mac[] = {0xD8, 0x13, 0x2A, 0x73, 0x46, 0xB4};
+
 esp_now_peer_info_t peerInfo;
 String sta;
 
@@ -37,6 +44,9 @@ int gameFlagupdated = 0;
 
 bool EOGroutineDone = false;
 bool SOGroutineDone = false;
+
+bool gamePaused = true;
+bool pausePrinted = false;
 
 // OPTION 1 (recommended) is to use the HARDWARE SPI pins, which are unique
 // to each board and not reassignable. For Arduino Uno: MOSI = pin 11 and
@@ -179,17 +189,51 @@ void gameTimer(){
 
 void gameFlagsend(){
   if(millis() - gameFlagupdated > 1000){
-    esp_now_send(player1Mac, (uint8_t *) &gameFlag, sizeof(gameFlag));
-    esp_now_send(player2Mac, (uint8_t *) &gameFlag, sizeof(gameFlag));
+    Serial.println("Sending game flag");
+    Serial.println(esp_now_send(player1Mac, (uint8_t *) &gameFlag, sizeof(gameFlag)));
+    Serial.println(esp_now_send(player2Mac, (uint8_t *) &gameFlag, sizeof(gameFlag)));
+    Serial.println(esp_now_send(player3Mac, (uint8_t *) &gameFlag, sizeof(gameFlag)));
+    Serial.println(esp_now_send(player4Mac, (uint8_t *) &gameFlag, sizeof(gameFlag)));
+    Serial.println(esp_now_send(player5Mac, (uint8_t *) &gameFlag, sizeof(gameFlag)));
     gameFlagupdated = millis();
   }
 }
 
 void SOG(){
+  Serial.println("sending game flag 2 to trigger SOG on bots");
   gameFlag = 2;
   gameFlagsend();
   delay(200);
   gameFlag = 1;
+}
+
+void playPause(){
+  if((digitalRead(play) == LOW) && gamePaused == false){
+    gamePaused = true;
+    delay(10);
+  }
+
+  if((digitalRead(play) == LOW) && gamePaused == true){
+    gamePaused = false;
+    delay(10);
+  }
+}
+
+void displayPaused(){
+  tft.fillScreen(ST77XX_RED);
+  tft.setRotation(3);
+  tft.setCursor(0, 0);
+  tft.setTextColor(ST7735_WHITE);
+  tft.setTextSize(2);
+  tft.setTextWrap(true);
+  tft.print("GAME PAUSED");
+}
+
+void espResetcheck(){
+  if(digitalRead(reset) == LOW){
+    //esp_restart();
+    ESP.restart();
+  }
 }
 
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
@@ -206,6 +250,7 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   if(status == ESP_NOW_SEND_SUCCESS) 
   sta="Delivery Success"; else sta="Delivery Fail";
+  Serial.println(sta);
 }
 
 void setup(void) {
@@ -229,6 +274,22 @@ void setup(void) {
   peerInfo.encrypt = false;
   esp_now_add_peer(&peerInfo);
 
+  memcpy(peerInfo.peer_addr, player3Mac, 6);
+  peerInfo.channel = 0;  
+  peerInfo.encrypt = false;
+  esp_now_add_peer(&peerInfo);
+
+  memcpy(peerInfo.peer_addr, player4Mac, 6);
+  peerInfo.channel = 0;  
+  peerInfo.encrypt = false;
+  esp_now_add_peer(&peerInfo);
+
+  memcpy(peerInfo.peer_addr, player5Mac, 6);
+  peerInfo.channel = 0;  
+  peerInfo.encrypt = false;
+  esp_now_add_peer(&peerInfo);
+
+
   // Use this initializer if using a 1.8" TFT screen:
   tft.initR(INITR_BLACKTAB);      // Init ST7735S chip, black tab
 
@@ -244,17 +305,36 @@ void setup(void) {
   testText();
   Serial.println("done");
 
+  pinMode(reset, INPUT_PULLUP);
+  pinMode(play, INPUT_PULLUP);
   timeRemaining = (gameLength * 60 * 1000)/1000;
 }
 
 void loop() {
-  if(SOGroutineDone == false){
-    SOG();
-    SOGroutineDone = true;
+
+  if(gamePaused == false){
+
+    if(SOGroutineDone == false){
+      SOG();
+      SOGroutineDone = true;
+    }
+    pausePrinted = false;
+
+    espResetcheck();
+    playPause();
+    gameTimer();
+    gameFlagsend();
+    delay(1);
   }
-  gameTimer();
-  gameFlagsend();
-  delay(1);
+  else{
+    playPause();
+    espResetcheck();
+    if(pausePrinted == false){
+      displayPaused();
+      pausePrinted = true;
+    }
+    
+  } 
 }
 
 
