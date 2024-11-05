@@ -34,6 +34,8 @@ int gameLength = 1;
 uint8_t gameFlag = 1;
 int gameFlagupdated = 0;
 
+bool EOGroutineDone = false;
+
 // OPTION 1 (recommended) is to use the HARDWARE SPI pins, which are unique
 // to each board and not reassignable. For Arduino Uno: MOSI = pin 11 and
 // SCLK = pin 13. This is the fastest mode of operation and is required if
@@ -166,6 +168,10 @@ void gameTimer(){
 
   if(timeRemaining == 0){
     gameFlag = 0;
+    if(EOGroutineDone == false){
+      displayRefresh();
+      EOGroutineDone = true;
+    }
   }
 }
 
