@@ -332,14 +332,17 @@ void loop() {
     delay(1);
   }
   else{
+    gameFlagsend();
     playPause();
     espResetcheck();
+
     if(pausePrinted == false){
       displayPaused();
       pausePrinted = true;
     }
-    
-  } 
+
+    delay(1);
+    } 
 }
 
 
