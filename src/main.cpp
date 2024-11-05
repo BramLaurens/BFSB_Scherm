@@ -210,12 +210,12 @@ void SOG(){
 void playPause(){
   if((digitalRead(play) == LOW) && gamePaused == false){
     gamePaused = true;
-    delay(20);
+    delay(200);
   }
 
   if((digitalRead(play) == LOW) && gamePaused == true){
     gamePaused = false;
-    delay(20);
+    delay(200);
   }
 }
 
