@@ -14,6 +14,7 @@
 
 /////////////////ESPNOW INIT/////////////////////////////////////
 uint8_t player1Mac[] = {0xC8, 0x2E, 0x18, 0x25, 0xEC, 0xB0};
+uint8_t player2Mac[] = {0xD8, 0x13, 0x2A, 0x72, 0xFF, 0x18};
 esp_now_peer_info_t peerInfo;
 String sta;
 
@@ -29,12 +30,13 @@ int player5score = 0;
 
 int timeRemaining = 0;
 int secondTick = 0;
-int gameLength = 1;
+int gameLength = 2;
 
 uint8_t gameFlag = 1;
 int gameFlagupdated = 0;
 
 bool EOGroutineDone = false;
+bool SOGroutineDone = false;
 
 // OPTION 1 (recommended) is to use the HARDWARE SPI pins, which are unique
 // to each board and not reassignable. For Arduino Uno: MOSI = pin 11 and
@@ -178,8 +180,16 @@ void gameTimer(){
 void gameFlagsend(){
   if(millis() - gameFlagupdated > 1000){
     esp_now_send(player1Mac, (uint8_t *) &gameFlag, sizeof(gameFlag));
+    esp_now_send(player2Mac, (uint8_t *) &gameFlag, sizeof(gameFlag));
     gameFlagupdated = millis();
   }
+}
+
+void SOG(){
+  gameFlag = 2;
+  gameFlagsend();
+  delay(200);
+  gameFlag = 1;
 }
 
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
@@ -214,6 +224,11 @@ void setup(void) {
   peerInfo.encrypt = false;
   esp_now_add_peer(&peerInfo);
 
+  memcpy(peerInfo.peer_addr, player2Mac, 6);
+  peerInfo.channel = 0;  
+  peerInfo.encrypt = false;
+  esp_now_add_peer(&peerInfo);
+
   // Use this initializer if using a 1.8" TFT screen:
   tft.initR(INITR_BLACKTAB);      // Init ST7735S chip, black tab
 
@@ -233,10 +248,16 @@ void setup(void) {
 }
 
 void loop() {
+  if(SOGroutineDone == false){
+    SOG();
+    SOGroutineDone = true;
+  }
   gameTimer();
   gameFlagsend();
   delay(1);
 }
+
+
 
 
 
